@@ -1,0 +1,148 @@
+<head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <script type='text/javascript' src='https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.0/knockout-min.js'></script>
+</head>
+
+<body style="font-family: 'Courier New', Courier, monospace">
+    <div class="m-5" style="height: 150px">
+        <div class="row">
+            <textarea class="form-control" rows="3"  type="text" data-bind="textInput: input"></textarea>
+        </div>
+        <br>
+        <span class="mt-5" data-bind="html: unrecognizedLabel" style="color: red"></span>
+        <!-- <br><span class="mt-5" data-bind="html: output"></span> -->
+    </div>
+    <div class="mx-auto" style="width: 1900px">
+        <canvas class="border" id="canvas" width="1800" height="1020"></canvas>
+    </div>
+</body>
+
+
+<script>
+    var vm = function() {
+        self.input = ko.observable()
+        self.output = ko.computed(function() {
+            return stringToCoords(self.input())
+        })
+        self.unrecognized = ko.observableArray([])
+        self.unrecognizedLabel = ko.computed(function() {
+            if (self.unrecognized().length) {
+                return "Unrecognized: " + self.unrecognized()
+            } else {
+                return
+            }
+        })
+
+        // Takes a string, sanitizes  it, and returns steps starting from 0,0. Positive is up and right, negative is down and left.
+        function stringToCoords(string) {
+            if (!string) {
+                return 
+            }
+
+            self.unrecognized([])
+
+            string = string.toUpperCase()
+            dirs = string.split(" ").filter(f => f)
+
+            var x = 0
+            var y = 0
+
+            return dirs.map(dir => {
+                // valid?
+                if (!/\d*[NESW]+/.test(dir) || /[^NESW\d]/.test(dir)) {
+                    self.unrecognized.push(dir)
+                    return
+                }
+
+                var magnitude = 1
+                // Contains number
+                if (/\d+[NESW]+/g.test(dir)) {
+                    magnitude = parseInt(/(\d+)/g.exec(dir)[0])
+                }
+
+                if (/N/g.test(dir)) {
+                    y += magnitude
+                }
+                if (/S/g.test(dir)) {
+                    y -= magnitude
+                }
+                if (/E/g.test(dir)) {
+                    x += magnitude
+                }
+                if (/W/g.test(dir)) {
+                    x -= magnitude
+                }
+
+                return [x,y]
+            }).filter(f => f);
+        }
+
+        var canvas = document.getElementById("canvas")
+        var c = canvas.getContext('2d')
+
+        var center = [canvas.width/2, canvas.height/2]
+
+        var scale = 30
+        var dot = scale / 10
+        var pi2 = 2 * Math.PI
+
+        // Draw canvas
+        ko.computed(function() {
+            c.clearRect(0,0,canvas.width, canvas.height)
+
+            // Grid
+            c.strokeStyle = "#DDDDDD"
+            for (var i = -50; i <= 50; i++) {
+                var ac = adjustCoords([i, i])[0]
+                c.moveTo(0, ac)
+                c.lineTo(canvas.width, ac)
+                c.moveTo(ac, 0)
+                c.lineTo(ac, canvas.height)
+            }
+            c.stroke()
+    
+            if (!self.output || !self.output()) {
+                return
+            }
+
+            c.beginPath()
+            c.moveTo(center[0], center[1])
+
+            // Line
+            c.strokeStyle = "#000000"
+            ko.utils.arrayForEach(self.output(), coord => {
+                var ac = adjustCoords(coord)
+
+                // Draw line
+                c.lineTo(ac[0], ac[1])
+                c.moveTo(ac[0], ac[1])
+            })
+            c.stroke()
+
+            // Dots
+            c.strokeStyle = "#000000"
+            ko.utils.arrayForEach(self.output(), coord => {
+                var ac = adjustCoords(coord)
+
+                c.moveTo(ac[0], ac[1])
+                // Draw dot
+                c.arc(ac[0], ac[1], dot, 0, pi2)
+                c.fill()
+            })
+
+            // Center
+            c.moveTo(center[0], center[1])
+            c.rect(center[0] - dot, center[1] - dot, dot*2, dot*2)
+            c.fill()
+
+            // Update on input
+            self.input()
+        })
+
+        function adjustCoords(coord) {
+            return [coord[0] * scale + center[0], coord[1] * -1 * scale + center[1]]
+        }
+    }
+
+    ko.applyBindings(vm)
+</script>
